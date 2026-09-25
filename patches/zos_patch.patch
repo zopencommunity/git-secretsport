@@ -1,0 +1,113 @@
+diff --git a/git-secrets b/git-secrets
+index 11be153..5891722 100755
+--- a/git-secrets
++++ b/git-secrets
+@@ -119,10 +119,24 @@ git_grep() {
+ # Performs a regular grep, taking into account patterns and recursion.
+ # Note: this function returns 1 on success, 0 on error.
+ regular_grep() {
+-  local files=("${@}") patterns=$(load_patterns) action='skip'
++  local patterns=$(load_patterns)
+   [ -z "${patterns}" ] && return 1
+-  [ ${RECURSIVE} -eq 1 ] && action="recurse"
+-  GREP_OPTIONS= LC_ALL=C grep -d "${action}" -nwHEI "${patterns}" "${files[@]}"
++  # Emulate -w using POSIX ERE word boundaries (z/OS grep has no -w/\b/[[:<:]])
++  # Map "-" to /dev/stdin (z/OS grep does not treat "-" as stdin)
++  # Append /dev/null to force filename:line output for single files (-H not on z/OS)
++  local files=()
++  for f in "${@}"; do
++    [ "$f" = "-" ] && files+=("/dev/stdin") || files+=("$f")
++  done
++  local pattern_args=()
++  while IFS= read -r p; do
++    [ -n "$p" ] && pattern_args+=(-e "(^|[^[:alnum:]_])(${p})([^[:alnum:]_]|$)")
++  done <<< "${patterns}"
++  if [ ${RECURSIVE} -eq 1 ]; then
++    GREP_OPTIONS= LC_ALL=C grep -r -nE "${pattern_args[@]}" "${files[@]}" /dev/null
++  else
++    GREP_OPTIONS= LC_ALL=C grep -nE "${pattern_args[@]}" "${files[@]}" /dev/null
++  fi
+ }
+ 
+ # Process the given status ($1) and output variables ($2).
+@@ -205,7 +219,7 @@ install_hook() {
+   echo "#!/usr/bin/env bash" > "${dest}"
+   echo "git secrets --${cmd} -- \"\$@\"" >> "${dest}"
+   chmod +x "${dest}"
+-  say "$(tput setaf 2)✓$(tput sgr 0) Installed ${hook} hook to ${dest}"
++  echo "Installed ${hook} hook to ${dest}"
+ }
+ 
+ install_all_hooks() {
+@@ -236,6 +250,8 @@ register_aws() {
+   local opt_quote="${quote}?"
+   add_config 'secrets.providers' 'git secrets --aws-provider'
+   add_config 'secrets.patterns' '(A3T[A-Z0-9]|AKIA|AGPA|AIDA|AROA|AIPA|ANPA|ANVA|ASIA)[A-Z0-9]{16}'
++  add_config 'secrets.patterns' 'ABSK[A-Za-z0-9+/]{109,}=*'
++  add_config 'secrets.patterns' 'bedrock-api-key-YmVkcm9jay5hbWF6b25hd3MuY29t'
+   add_config 'secrets.patterns' "${opt_quote}${aws}(SECRET|secret|Secret)?_?(ACCESS|access|Access)?_?(KEY|key|Key)${opt_quote}${connect}${opt_quote}[A-Za-z0-9/\+=]{40}${opt_quote}"
+   add_config 'secrets.patterns' "${opt_quote}${aws}(ACCOUNT|account|Account)_?(ID|id|Id)?${opt_quote}${connect}${opt_quote}[0-9]{4}\-?[0-9]{4}\-?[0-9]{4}${opt_quote}"
+   add_config 'secrets.allowed' 'AKIAIOSFODNN7EXAMPLE'
+@@ -244,8 +260,6 @@ register_aws() {
+   if [[ $? == 0 ]]; then
+     echo 'OK'
+   fi
+-
+-  exit $?
+ }
+ 
+ aws_provider() {
+diff --git a/test/test_helper.bash b/test/test_helper.bash
+index 9133e51..6e54f8f 100644
+--- a/test/test_helper.bash
++++ b/test/test_helper.bash
+@@ -1,14 +1,24 @@
+-#!/bin/bash
++#!/usr/bin/env bash
+ export TEST_REPO="$BATS_TMPDIR/test-repo"
+ export TEMP_HOME="$BATS_TMPDIR/home"
+ export TEMPLATE_DIR="${BATS_TMPDIR}/template"
+ INITIAL_PATH="${PATH}"
+ INITIAL_HOME=${HOME}
+ 
++# z/OS safe recursive remove: only runs if directory exists.
++# Avoids rm -rf which z/OS does not support as a combined flag.
++zos_rmdir() {
++  local dir="$1"
++  [ -d "$dir" ] || return 0
++  find "$dir" -depth -type f -exec rm -f {} \; 2>/dev/null || true
++  find "$dir" -depth -type l -exec rm -f {} \; 2>/dev/null || true
++  find "$dir" -depth -type d -exec rmdir {} \; 2>/dev/null || true
++}
++
+ setup() {
+   setup_repo
+-  [ -d "${TEMPLATE_DIR}" ] && rm -rf "${TEMPLATE_DIR}"
+-  [ -d "${TEMP_HOME}" ] && rm -rf "${TEMP_HOME}"
++  zos_rmdir "${TEMPLATE_DIR}"
++  zos_rmdir "${TEMP_HOME}"
+   mkdir -p $TEMP_HOME
+   export HOME=$TEMP_HOME
+   export PATH="${BATS_TEST_DIRNAME}/..:${INITIAL_PATH}"
+@@ -19,18 +29,18 @@ teardown() {
+   delete_repo
+   export PATH="${INITIAL_PATH}"
+   export HOME="${INITIAL_HOME}"
+-  [ -d "${TEMP_HOME}" ] && rm -rf "${TEMP_HOME}"
++  zos_rmdir "${TEMP_HOME}"
+ }
+ 
+ delete_repo() {
+-  [ -d $TEST_REPO ] && rm -rf $TEST_REPO || true
++  zos_rmdir "$TEST_REPO"
+ }
+ 
+ setup_repo() {
+   delete_repo
+   mkdir -p $TEST_REPO
+   cd $TEST_REPO
+-  git init
++  git init --initial-branch=master
+   git config --local --add secrets.patterns '@todo'
+   git config --local --add secrets.patterns 'forbidden|me'
+   git config --local --add secrets.patterns '#hash'

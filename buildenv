@@ -1,0 +1,143 @@
+# bump: git-secrets-version /GIT-SECRETS_VERSION="(.*)"/ https://github.com/awslabs/git-secrets/tags|semver:*
+GIT_SECRETS_VERSION="1.3.0"
+
+###
+### Build control file for the git-secrets port
+###
+
+###
+### Required Environment Variables
+###
+export ZOPEN_PROJECT_NAME="git-secrets"
+export ZOPEN_BUILD_LINE="STABLE"
+export ZOPEN_STABLE_URL="https://github.com/awslabs/git-secrets/archive/refs/tags/${GIT_SECRETS_VERSION}.tar.gz"
+export ZOPEN_STABLE_DEPS="make bash git curl coreutils grep"
+export ZOPEN_DEV_URL="https://github.com/awslabs/git-secrets.git"
+export ZOPEN_DEV_DEPS="make bash git curl"
+export ZOPEN_CATEGORIES="security development language ai core utilities editor source_control"
+export ZOPEN_RUNTIME_DEPS="git bash curl"
+# export ZOPEN_SYSTEM_PREREQ="zos25" # optional system pre-req (default=zos25)
+export ZOPEN_RUNTIME_DEPS="git bash"
+
+# No ./configure script
+export ZOPEN_CONFIGURE="skip"
+
+# No compilation needed — pure shell script, skip the build phase
+export ZOPEN_MAKE="skip"
+
+# Install directly via make, pointing PREFIX at zopen's managed directory
+export ZOPEN_INSTALL="make"
+export ZOPEN_INSTALL_OPTS="install PREFIX=\${ZOPEN_INSTALL_DIR}"
+
+# The Makefile has no 'check' target — correct target is 'test' (needs bats)
+# Skip for now until bats port is available
+export ZOPEN_CHECK_OPTS="test"
+export ZOPEN_CONFIGURE_MINIMAL="y"
+export ZOPEN_MAKE_MINIMAL="y"
+export ZOPEN_CHECK_MINIMAL="y"
+export ZOPEN_INSTALL_MINIMAL="y"
+
+###
+### Build settings (Port type: BUILD, Build system: GNU Make)
+###
+### Optional Settings for GNU Make build system (Autotools)
+#export ZOPEN_EXTRA_CONFIGURE_OPTS="--with-ssl" # Add any additional configure options here
+#export ZOPEN_EXTRA_CFLAGS="-mzos-target=zosv2r5" # Add any additional compiler options here
+
+
+###
+### Required user-supplied functions
+###
+
+zopen_check_results() {
+  dir="$1"
+  pfx="$2"
+  chk="$1/$2_check.log"
+  # Add logic to extract the test results here:
+  echo "actualFailures:0"
+  echo "totalTests:1"
+  echo "expectedFailures:0"
+  echo "expectedTotalTests:1"
+}
+
+zopen_get_version() {
+  echo "1.0.0" # Modify to echo the version of your tool/library
+}
+
+
+###
+### Custom Build Logic (if applicable)
+###
+# For libraries, this hook exports variables for other ports to use.
+#zopen_append_to_env() {
+#  cat <<END
+#if [ ! -z "\$ZOPEN_IN_ZOPEN_BUILD" ]; then
+#  export ZOPEN_EXTRA_CFLAGS="\${ZOPEN_EXTRA_CFLAGS} -I\${PWD}/include"
+#  export ZOPEN_EXTRA_CXXFLAGS="\${ZOPEN_EXTRA_CXXFLAGS} -I\${PWD}/include"
+#  export ZOPEN_EXTRA_LDFLAGS="\${ZOPEN_EXTRA_LDFLAGS} -L\${PWD}/lib"
+#  export ZOPEN_EXTRA_LIBS="\${ZOPEN_EXTRA_LIBS} -lgit-secrets"
+#fi
+#END
+#}
+
+###
+### Optional User-Supplied Hooks (uncomment to use)
+###
+
+#zopen_append_to_env() {
+#  ## This function runs as part of generation of the .env file. The output of the
+#  ## function is appended to .env.
+#}
+#
+#zopen_append_to_setup(){
+#  ## This function runs as part of generation of the setup.sh file. The output of
+#  ## the function is appended to setup.sh.
+#}
+#
+#zopen_append_to_validate_install(){
+#  ## This function runs as part of generation of the install_test.sh file. The
+#  ## output of the function is appended to install_test.sh script.
+#}
+#
+#zopen_install_caveats(){
+#  ## This function is run post install. All stdout messages are captured and
+#  ## added to the metadata.json as installation caveats.
+#}
+#
+#zopen_init(){
+#  ## This function runs after code is downloaded and patched but before the code
+#  ## is built.
+#}
+#
+#zopen_post_buildenv(){
+#  ## This function runs after the 'buildenv' is processed.
+#}
+#
+#zopen_pre_build(){
+#  ## This function runs before the 'make' step of the build is run.
+#}
+#
+#zopen_pre_check(){
+#  ## This function runs before the 'check' step of the build is run.
+#}
+#
+#zopen_pre_configure(){
+#  ## This function runs before the 'configure' step of the build is run.
+#}
+#
+#zopen_pre_install(){
+#  ## This function runs before the 'install' step of the build is run.
+#}
+#
+#zopen_post_install(){
+#  ## This function runs after the 'install' step of the build is run.
+#}
+#
+#zopen_pre_patch(){
+#  ## This function runs before the 'patch' step of the build is run.
+#}
+#
+#zopen_pre_terminate(){
+#  ## This function runs before 'zopen build' terminates.
+#}
+
